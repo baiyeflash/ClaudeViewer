@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Claude 数据查看器 v5.0</title>
+<title>Claude 数据查看器 v5.1</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
@@ -245,7 +245,7 @@ code.tag{background:var(--pl);color:var(--pd);padding:1px 7px;border-radius:4px;
 #vc{position:relative}
 
 /* Messages */
-.msg-wrap{padding:5px 14px;display:flex}
+.msg-wrap{padding:10px 14px;margin-bottom:6px;display:flex}
 .msg-wrap.human{justify-content:flex-end}
 .msg-wrap.assistant{justify-content:flex-start}
 .msg-inner{max-width:82%}
@@ -257,18 +257,19 @@ code.tag{background:var(--pl);color:var(--pd);padding:1px 7px;border-radius:4px;
 .sender-label.assistant{color:#6B8F71}
 
 /* Thinking */
-.thinking-block{margin-bottom:6px;border-radius:12px;border:1px solid var(--bd);
-  background:var(--tag-bg);overflow:hidden}
+.thinking-block{margin-bottom:12px;border-radius:12px;border:1px solid var(--bd);
+  background:var(--tag-bg);overflow:hidden;position:relative;z-index:1}
 .thinking-toggle{display:flex;align-items:center;gap:7px;padding:7px 11px;
   cursor:pointer;font-size:11px;color:var(--t3);user-select:none;transition:background .12s}
 .thinking-toggle:hover{background:var(--sand)}
 .ti{font-size:9px;transition:transform .18s;display:inline-block}
 .thinking-toggle.open .ti{transform:rotate(90deg)}
 .thinking-sum{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-style:italic}
-.thinking-body{display:none;padding:9px 12px;border-top:1px solid var(--bd);
-  background:var(--bg);font-size:12px;color:var(--t2);line-height:1.65;
-  white-space:pre-wrap;font-style:italic;max-height:300px;overflow-y:auto}
+.thinking-body{display:none;padding:12px 14px;border-top:1px solid var(--bd);
+  background:var(--bg);font-size:12px;color:var(--t2);line-height:1.7;
+  white-space:pre-wrap;font-style:italic;max-height:none;overflow-y:auto}
 .thinking-body.open{display:block}
+.thinking-block + .bubble{margin-top:8px}
 
 /* Attachments */
 .att-block{margin-top:6px;border-radius:10px;border:1px solid var(--bd);
@@ -391,6 +392,27 @@ mark.hl.cur{background:var(--primary);color:#fff}
 .code-copy:hover{background:rgba(255,255,255,.2)}
 .code-copy.done{background:#6B8F71;color:#fff;border-color:#6B8F71;opacity:1}
 
+/* ── 消息操作栏 ── */
+.msg-actions{display:flex;gap:4px;margin-top:4px;opacity:0;transition:opacity .15s;
+  justify-content:flex-end}
+.msg-wrap:hover .msg-actions{opacity:1}
+.msg-wrap.human .msg-actions{justify-content:flex-end}
+.msg-wrap.assistant .msg-actions{justify-content:flex-start}
+
+.action-btn{background:var(--pl);border:1px solid var(--bd);color:var(--t3);
+  border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer;
+  font-family:var(--fb);transition:all .15s}
+.action-btn:hover{background:var(--sand);color:var(--t2)}
+.action-btn.done{background:#6B8F71;color:#fff;border-color:#6B8F71}
+
+/* ── 思考/附件操作栏 ── */
+.think-actions,.att-actions{display:flex;gap:4px;padding:4px 11px;
+  border-top:1px solid var(--bd);opacity:0;transition:opacity .15s}
+.thinking-block:hover .think-actions,
+.att-block:hover .att-actions{opacity:1}
+.think-actions{justify-content:flex-end}
+.att-actions{justify-content:flex-end}
+
 /* ── v4: HEATMAP ── */
 .heatmap-wrap{overflow-x:auto;padding-bottom:4px}
 .heatmap{display:flex;gap:3px}
@@ -445,7 +467,7 @@ mark.hl.cur{background:var(--primary);color:#fff}
   <div class="u-logo">🗂️</div>
   <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px">
     <div class="u-title">Claude 数据查看器</div>
-    <div class="ver-badge">v5.0</div>
+    <div class="ver-badge">v5.1</div>
     <div class="u-sub">数据完全本地处理 · 不上传任何内容</div>
   </div>
   <div class="drop-zone" id="drop-zone">
@@ -455,7 +477,7 @@ mark.hl.cur{background:var(--primary);color:#fff}
     <label for="file-input" class="pick-btn" id="pick-label">选择文件</label>
     <input type="file" id="file-input" accept=".json,.zip,.md,.markdown" multiple>
   </div>
-  <div class="u-note">对话 · 项目 · 记忆 · 账户 · 统计 · 全局搜索 · 收藏标签 · 深色模式</div>
+  <div class="u-note">对话 · 项目 · 记忆 · 账户 · 统计 · 全局搜索 · 收藏标签 · 深色模式 · LaTeX公式 · 混合渲染</div>
 </div>
 
 <!-- MAIN -->
@@ -563,10 +585,8 @@ let filterFav=false,filterTag='';
 let dayFilter='';
 
 // VS
-const EST_H=130,SCAN=4;
-const FULL_RENDER_THRESHOLD=500; // <= this many messages: render all at once (smoother + Ctrl+F); else virtual scroll
+const EST_H=150,SCAN=4;
 let heights=[],offsets=[],totalH=0,rendered=new Map();
-let fullRenderMode=false;
 // Search
 let srchQ='',srchHits=[],srchCur=-1;
 // Global search results
@@ -579,7 +599,7 @@ let srchSidebarOpen=false;
 // ── INDEXEDDB ──────────────────────────────────────────
 function openDB(){
   return new Promise((res,rej)=>{
-    const req=indexedDB.open('claude_viewer_v4',1);
+    const req=indexedDB.open('claude_viewer_v51',1);
     req.onupgradeneeded=e=>{
       const db=e.target.result;
       if(!db.objectStoreNames.contains('store'))db.createObjectStore('store',{keyPath:'key'});
@@ -1063,17 +1083,13 @@ function openConvAtMsg(convUuid,msgUuid,q){
   openConv(convUuid,()=>{
     searchInput.value=q;
     doSearch();
-    // Jump to the first hit in the matched message
+    // Jump to the exact message that matched
     const idx=curMsgs.findIndex(m=>m.uuid===msgUuid);
     if(idx>=0){
-      const hitPos=srchHits.findIndex(h=>h.msgIdx===idx);
+      // sync srchCur to this message if it's among hits
+      const hitPos=srchHits.indexOf(idx);
       if(hitPos>=0){srchCur=hitPos;scrollToHit(hitPos);}
-      else{
-        const node=rendered.get(idx);
-        if(fullRenderMode&&node){const r=node.getBoundingClientRect(),vpr=vp.getBoundingClientRect();vp.scrollTop+=(r.top-vpr.top)-80;}
-        else{vp.scrollTop=Math.max(0,(offsets[idx]||0)-80);renderVisible();}
-        setTimeout(applyHL,150);
-      }
+      else{vp.scrollTop=Math.max(0,(offsets[idx]||0)-80);renderVisible();setTimeout(applyHL,120);}
     }
   });
 }
@@ -1374,14 +1390,67 @@ function openConv(uuid,callback){
   if(_openCallback)setTimeout(()=>{_openCallback();_openCallback=null;},150);
 }
 
-// ── RENDER MODE: full vs virtual ───────────────────────
+// ── v5: LATEX RENDERING ───────────────────────────────
+function renderLatex(container){
+  if(typeof katex==='undefined')return;
+  const walker=document.createTreeWalker(container,NodeFilter.SHOW_TEXT,{
+    acceptNode(node){
+      let p=node.parentNode;
+      while(p&&p!==container){
+        const tag=p.tagName;
+        if(tag==='CODE'||tag==='PRE'||(p.className&&String(p.className).indexOf('katex')>=0))
+          return NodeFilter.FILTER_REJECT;
+        p=p.parentNode;
+      }
+      return /(\$\$[\s\S]+?\$\$)|(\$[^$\n]+?\$)|(\\\([\s\S]+?\\\))|(\\\[[\s\S]+?\\\])/.test(node.textContent)
+        ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    }
+  });
+  const targets=[];let n;
+  while((n=walker.nextNode()))targets.push(n);
+  targets.forEach(node=>{
+    const text=node.textContent;
+    const frag=document.createDocumentFragment();
+    const re=/(\$\$[\s\S]+?\$\$)|(\\\[[\s\S]+?\\\])|(\$[^$\n]+?\$)|(\\\([\s\S]+?\\\))/g;
+    let last=0,m;
+    while((m=re.exec(text))!==null){
+      if(m.index>last)frag.appendChild(document.createTextNode(text.slice(last,m.index)));
+      const raw=m[0];let tex,display;
+      if(raw.startsWith('$$')){tex=raw.slice(2,-2);display=true;}
+      else if(raw.startsWith('\\[')){tex=raw.slice(2,-2);display=true;}
+      else if(raw.startsWith('\\(')){tex=raw.slice(2,-2);display=false;}
+      else{tex=raw.slice(1,-1);display=false;}
+      const span=document.createElement('span');
+      try{katex.render(tex.trim(),span,{displayMode:display,throwOnError:false,errorColor:'#C4653A'});}
+      catch(e){span.textContent=raw;}
+      frag.appendChild(span);last=re.lastIndex;
+    }
+    if(last<text.length)frag.appendChild(document.createTextNode(text.slice(last)));
+    if(frag.childNodes.length)node.parentNode.replaceChild(frag,node);
+  });
+}
+
+// ── v5: UNSUPPORTED BLOCK HANDLER ─────────────────────
+function replaceUnsupportedBlocks(text){
+  if(!text)return text;
+  const placeholder='This block is not supported on your current device yet.';
+  if(text.indexOf(placeholder)===-1)return text;
+  text=text.replace(/```[a-zA-Z]*\s*\n?\s*This block is not supported on your current device yet\.\s*\n?```/g,
+    '\n> ⚠️ **此处原为公式或可视化组件** — Claude 导出数据未包含其源码，请在 Claude 网页版查看。\n');
+  text=text.split(placeholder).join('⚠️ 此处原为公式或可视化组件（导出数据未包含源码）');
+  return text;
+}
+
+// ── VIRTUAL SCROLL ─────────────────────────────────────
+const FULL_RENDER_THRESHOLD=500;
+let fullRenderMode=false;
+
 function initVS(){
-  fullRenderMode = curMsgs.length <= FULL_RENDER_THRESHOLD;
+  fullRenderMode=curMsgs.length<=FULL_RENDER_THRESHOLD;
   if(fullRenderMode) initFullRender();
   else initVirtualScroll();
 }
 
-// Full render: build all messages in normal document flow (no absolute positioning)
 function initFullRender(){
   rendered.clear();vc.innerHTML='';
   vc.style.height='auto';vc.style.position='static';
@@ -1396,7 +1465,6 @@ function initFullRender(){
   if(srchQ)applyHL();
 }
 
-// Virtual scroll: only render visible window
 function initVirtualScroll(){
   vc.style.position='relative';
   heights=new Array(curMsgs.length).fill(EST_H);
@@ -1421,7 +1489,7 @@ function getRange(){
   return[s,e];
 }
 function renderVisible(){
-  if(fullRenderMode)return; // full render: nothing to do on scroll
+  if(fullRenderMode)return;
   if(!curMsgs.length)return;
   const[s,e]=getRange();
   for(const[i,node]of rendered){if(i<s||i>e){node.remove();rendered.delete(i);}}
@@ -1470,12 +1538,24 @@ function buildMsg(msg,idx){
   if(!isH)(msg.content||[]).filter(b=>b.type==='thinking').forEach(b=>inner.appendChild(buildThinking(b)));
   // Text bubble
   let textContent=(msg.content||[]).filter(b=>b.type==='text').map(b=>b.text||'').join('\n').trim()||msg.text||'';
-  textContent=replaceUnsupportedBlocks(textContent);
+  if(!isH)textContent=replaceUnsupportedBlocks(textContent);
   if(textContent.trim()){
     const bubble=document.createElement('div');bubble.className='bubble '+(isH?'human':'assistant');
-    if(isH){bubble.innerHTML=esc(textContent).replace(/\n/g,'<br>');renderLatex(bubble);}
+    if(isH)bubble.innerHTML=esc(textContent).replace(/\n/g,'<br>');
     else try{bubble.innerHTML=marked.parse(textContent);enhanceCodeBlocks(bubble);renderLatex(bubble);}catch{bubble.textContent=textContent;}
     inner.appendChild(bubble);
+    // 操作栏
+    const actions=document.createElement('div');actions.className='msg-actions';
+    const copyBtn=document.createElement('button');copyBtn.className='action-btn';copyBtn.textContent='📋 复制';
+    copyBtn.addEventListener('click',e=>{
+      e.stopPropagation();
+      navigator.clipboard.writeText(textContent).then(()=>{
+        copyBtn.textContent='✅ 已复制';copyBtn.classList.add('done');
+        setTimeout(()=>{copyBtn.textContent='📋 复制';copyBtn.classList.remove('done');},1500);
+      }).catch(()=>{copyBtn.textContent='❌ 失败';setTimeout(()=>copyBtn.textContent='📋 复制',1500);});
+    });
+    actions.appendChild(copyBtn);
+    inner.appendChild(actions);
   }
   // Attachments
   const atts=msg.attachments||[];
@@ -1496,62 +1576,6 @@ function buildMsg(msg,idx){
     });
   }
   wrap.appendChild(inner);return wrap;
-}
-
-// ── LATEX RENDERING (KaTeX, CDN) ──
-// ── friendly notice for unsupported (widget) blocks ──
-function replaceUnsupportedBlocks(text){
-  if(!text)return text;
-  // Claude export turns interactive widget/visualization blocks into this placeholder,
-  // wrapped in a code fence. Replace with a friendly blockquote notice.
-  const placeholder='This block is not supported on your current device yet.';
-  if(text.indexOf(placeholder)===-1)return text;
-  // Remove the code-fence wrapping around the placeholder, then replace the line
-  // Handles ```\n<placeholder>\n``` and bare placeholder lines.
-  text=text.replace(/```[a-zA-Z]*\s*\n?\s*This block is not supported on your current device yet\.\s*\n?```/g,
-    '\n> ⚠️ **此处原为公式或可视化组件** — Claude 导出数据未包含其源码，请在 Claude 网页版查看。\n');
-  // Any remaining bare placeholders
-  text=text.split(placeholder).join('⚠️ 此处原为公式或可视化组件（导出数据未包含源码）');
-  return text;
-}
-
-function renderLatex(container){
-  if(typeof katex==='undefined')return;
-  const walker=document.createTreeWalker(container,NodeFilter.SHOW_TEXT,{
-    acceptNode(node){
-      let p=node.parentNode;
-      while(p&&p!==container){
-        const tag=p.tagName;
-        if(tag==='CODE'||tag==='PRE'||(p.className&&String(p.className).indexOf('katex')>=0))
-          return NodeFilter.FILTER_REJECT;
-        p=p.parentNode;
-      }
-      return /(\$\$[\s\S]+?\$\$)|(\$[^$\n]+?\$)|(\\\([\s\S]+?\\\))|(\\\[[\s\S]+?\\\])/.test(node.textContent)
-        ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
-    }
-  });
-  const targets=[];let n;
-  while((n=walker.nextNode()))targets.push(n);
-  targets.forEach(node=>{
-    const text=node.textContent;
-    const frag=document.createDocumentFragment();
-    const re=/(\$\$[\s\S]+?\$\$)|(\\\[[\s\S]+?\\\])|(\$[^$\n]+?\$)|(\\\([\s\S]+?\\\))/g;
-    let last=0,m;
-    while((m=re.exec(text))!==null){
-      if(m.index>last)frag.appendChild(document.createTextNode(text.slice(last,m.index)));
-      const raw=m[0];let tex,display;
-      if(raw.startsWith('$$')){tex=raw.slice(2,-2);display=true;}
-      else if(raw.startsWith('\\[')){tex=raw.slice(2,-2);display=true;}
-      else if(raw.startsWith('\\(')){tex=raw.slice(2,-2);display=false;}
-      else{tex=raw.slice(1,-1);display=false;}
-      const span=document.createElement('span');
-      try{katex.render(tex.trim(),span,{displayMode:display,throwOnError:false,errorColor:'#C4653A'});}
-      catch(e){span.textContent=raw;}
-      frag.appendChild(span);last=re.lastIndex;
-    }
-    if(last<text.length)frag.appendChild(document.createTextNode(text.slice(last)));
-    if(frag.childNodes.length)node.parentNode.replaceChild(frag,node);
-  });
 }
 
 function enhanceCodeBlocks(container){
@@ -1581,9 +1605,40 @@ function buildThinking(b){
   const sumEl=document.createElement('span');sumEl.className='thinking-sum';
   if(sums)sumEl.textContent='— '+sums;
   toggle.appendChild(arrow);toggle.appendChild(label);toggle.appendChild(sumEl);
-  const body=document.createElement('div');body.className='thinking-body';body.textContent=b.thinking||'';
-  toggle.addEventListener('click',()=>{const o=body.classList.toggle('open');toggle.classList.toggle('open',o);});
-  wrap.appendChild(toggle);wrap.appendChild(body);return wrap;
+  const body=document.createElement('div');body.className='thinking-body';
+  body.textContent=b.thinking||'';
+  // 操作栏
+  const actions=document.createElement('div');actions.className='think-actions';
+  const copyBtn=document.createElement('button');copyBtn.className='action-btn';copyBtn.textContent='📋 复制思考';
+  copyBtn.addEventListener('click',e=>{
+    e.stopPropagation();
+    navigator.clipboard.writeText(b.thinking||'').then(()=>{
+      copyBtn.textContent='✅ 已复制';copyBtn.classList.add('done');
+      setTimeout(()=>{copyBtn.textContent='📋 复制思考';copyBtn.classList.remove('done');},1500);
+    }).catch(()=>{copyBtn.textContent='❌ 失败';setTimeout(()=>copyBtn.textContent='📋 复制思考',1500);});
+  });
+  actions.appendChild(copyBtn);
+  toggle.addEventListener('click',()=>{
+    const o=body.classList.toggle('open');
+    toggle.classList.toggle('open',o);
+    // 通知虚拟滚动系统更新高度
+    requestAnimationFrame(()=>{
+      const msgWrap=wrap.closest('.msg-wrap');
+      if(msgWrap){
+        const idx=parseInt(msgWrap.dataset.idx);
+        if(!isNaN(idx)&&heights[idx]!==undefined){
+          const newH=msgWrap.offsetHeight;
+          if(newH>0&&newH!==heights[idx]){
+            heights[idx]=newH;
+            recomputeOffsets();
+            vc.style.height=totalH+'px';
+            for(const[j,n]of rendered)n.style.top=offsets[j]+'px';
+          }
+        }
+      }
+    });
+  });
+  wrap.appendChild(toggle);wrap.appendChild(body);wrap.appendChild(actions);return wrap;
 }
 
 function buildAttachment(a){
@@ -1602,7 +1657,18 @@ function buildAttachment(a){
     const ti=document.createElement('span');ti.className='ti';ti.style.cssText='font-size:9px;margin-right:4px';ti.textContent='▶';
     hdr.insertBefore(ti,icon);
     hdr.addEventListener('click',()=>{const o=body.classList.toggle('open');ti.style.transform=o?'rotate(90deg)':'';});
-    wrap.appendChild(hdr);wrap.appendChild(body);
+    // 操作栏
+    const actions=document.createElement('div');actions.className='att-actions';
+    const copyBtn=document.createElement('button');copyBtn.className='action-btn';copyBtn.textContent='📋 复制内容';
+    copyBtn.addEventListener('click',e=>{
+      e.stopPropagation();
+      navigator.clipboard.writeText(a.extracted_content).then(()=>{
+        copyBtn.textContent='✅ 已复制';copyBtn.classList.add('done');
+        setTimeout(()=>{copyBtn.textContent='📋 复制内容';copyBtn.classList.remove('done');},1500);
+      }).catch(()=>{copyBtn.textContent='❌ 失败';setTimeout(()=>copyBtn.textContent='📋 复制内容',1500);});
+    });
+    actions.appendChild(copyBtn);
+    wrap.appendChild(hdr);wrap.appendChild(body);wrap.appendChild(actions);
   } else {
     wrap.appendChild(hdr);
   }
@@ -1619,15 +1685,7 @@ function doSearch(){
   removeHL();srchQ=searchInput.value.trim();srchHits=[];srchCur=-1;
   if(!srchQ){searchCount.textContent='';searchPrev.disabled=searchNext.disabled=true;renderSrchSidebar();return;}
   const q=srchQ.toLowerCase();
-  // Occurrence-level hits: each hit = {msgIdx, occInMsg, globalOcc}
-  curMsgs.forEach((m,i)=>{
-    const txt=msgText(m).toLowerCase();
-    let pos=0,occ=0;
-    while((pos=txt.indexOf(q,pos))!==-1){
-      srchHits.push({msgIdx:i,occ:occ});
-      pos+=q.length;occ++;
-    }
-  });
+  curMsgs.forEach((m,i)=>{if(msgText(m).toLowerCase().includes(q))srchHits.push(i);});
   if(!srchHits.length){searchCount.textContent='无结果';searchPrev.disabled=searchNext.disabled=true;renderSrchSidebar();return;}
   searchPrev.disabled=searchNext.disabled=false;srchCur=0;
   renderSrchSidebar();
@@ -1636,37 +1694,10 @@ function doSearch(){
 }
 function nextHit(d){if(!srchHits.length)return;srchCur=(srchCur+d+srchHits.length)%srchHits.length;scrollToHit(srchCur);}
 function scrollToHit(i){
-  const hit=srchHits[i];if(!hit)return;
-  const idx=hit.msgIdx;
-  searchCount.textContent=`${i+1}/${srchHits.length}`;
-  if(fullRenderMode){
-    // Node is already in DOM; scroll to it directly
-    applyHL();
-    const node=rendered.get(idx);
-    if(node){
-      const r=node.getBoundingClientRect(),vpr=vp.getBoundingClientRect();
-      vp.scrollTop+=(r.top-vpr.top)-80;
-    }
-    setTimeout(scrollCurIntoView,60);
-  } else {
-    vp.scrollTop=Math.max(0,offsets[idx]-80);
-    renderVisible();
-    setTimeout(()=>{renderVisible();applyHL();scrollCurIntoView();},150);
-  }
+  const idx=srchHits[i];searchCount.textContent=`${i+1}/${srchHits.length}`;
+  vp.scrollTop=Math.max(0,offsets[idx]-80);renderVisible();setTimeout(applyHL,120);
   // update active in sidebar
   srchSbList.querySelectorAll('.srch-res').forEach((el,j)=>el.classList.toggle('active',j===i));
-  const activeEl=srchSbList.querySelector('.srch-res.active');
-  if(activeEl)activeEl.scrollIntoView({block:'nearest'});
-}
-function scrollCurIntoView(){
-  const curMark=vc.querySelector('mark.hl.cur');
-  if(curMark){
-    const r=curMark.getBoundingClientRect(),vpr=vp.getBoundingClientRect();
-    if(r.top<vpr.top+40||r.bottom>vpr.bottom-40){
-      vp.scrollTop+=(r.top-vpr.top)-vp.clientHeight/3;
-      requestAnimationFrame(()=>{renderVisible();applyHL();});
-    }
-  }
 }
 
 // ── v4: SEARCH SIDEBAR ──
@@ -1675,23 +1706,16 @@ function renderSrchSidebar(){
   srchSbCount.textContent=srchHits.length?`(${srchHits.length})`:'';
   if(!srchHits.length){srchSbList.innerHTML='<div class="empty-hint" style="font-size:12px;padding:20px">无匹配结果</div>';return;}
   const q=srchQ.toLowerCase();
-  srchHits.forEach((hit,j)=>{
-    const m=curMsgs[hit.msgIdx];
+  srchHits.forEach((msgIdx,j)=>{
+    const m=curMsgs[msgIdx];
     const txt=msgText(m);
-    // Find the position of THIS occurrence
-    const lo=txt.toLowerCase();
-    let pos=-1,c=0;
-    for(let p=0;(p=lo.indexOf(q,p))!==-1;p+=q.length){if(c===hit.occ){pos=p;break;}c++;}
-    if(pos<0)pos=lo.indexOf(q);
-    const start=Math.max(0,pos-30),end=Math.min(txt.length,pos+srchQ.length+50);
-    const before=esc(txt.slice(start,pos));
-    const match=esc(txt.slice(pos,pos+srchQ.length));
-    const after=esc(txt.slice(pos+srchQ.length,end));
-    const snip=before+'<mark>'+match+'</mark>'+after;
+    const idx=txt.toLowerCase().indexOf(q);
+    const start=Math.max(0,idx-30),end=Math.min(txt.length,idx+srchQ.length+50);
+    const snip=esc(txt.slice(start,end)).replace(new RegExp(esc(srchQ),'gi'),mm=>`<mark>${mm}</mark>`);
     const div=document.createElement('div');div.className='srch-res'+(j===srchCur?' active':'');
     div.innerHTML=`<div class="srch-res-head">
       <span class="srch-res-sender ${m.sender==='human'?'human':'assistant'}">${m.sender==='human'?'You':'Claude'}</span>
-      <span class="srch-res-idx">#${hit.msgIdx+1}</span></div>
+      <span class="srch-res-idx">#${msgIdx+1}</span></div>
       <div class="srch-res-snip">${(start>0?'…':'')+snip+(end<txt.length?'…':'')}</div>`;
     div.addEventListener('click',()=>{srchCur=j;scrollToHit(j);});
     srchSbList.appendChild(div);
@@ -1706,45 +1730,26 @@ $('srch-toggle').addEventListener('click',()=>toggleSrchSidebar());
 $('srch-sb-close').addEventListener('click',()=>toggleSrchSidebar(false));
 function applyHL(){
   removeHL();if(!srchQ)return;
-  const q=srchQ.toLowerCase();
-  const curHit=srchHits[srchCur];
-  const curMsgIdx=curHit?curHit.msgIdx:-1;
-  const curOcc=curHit?curHit.occ:-1;
-  for(const[i,node]of rendered){
-    const isCurMsg=(i===curMsgIdx);
-    // For the current message, highlight all but mark the curOcc-th as .cur
-    node.querySelectorAll('.bubble,.thinking-body,.att-body').forEach(el=>hlEl(el,q,isCurMsg?curOcc:-1));
-  }
+  const q=srchQ.toLowerCase(),curIdx=srchHits[srchCur];
+  for(const[i,node]of rendered)
+    node.querySelectorAll('.bubble,.thinking-body,.att-body').forEach(el=>hlEl(el,q,i===curIdx));
 }
-function hlEl(el,q,curOcc){
-  // curOcc>=0 means: within this element's message, the curOcc-th occurrence is the current one
+function hlEl(el,q,isCur){
   const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);
   const tns=[];let n;while((n=walker.nextNode()))tns.push(n);
-  let msgNode=el;while(msgNode&&!(msgNode.classList&&msgNode.classList.contains('msg-wrap')))msgNode=msgNode.parentNode;
-  if(msgNode&&msgNode._occCounter===undefined)msgNode._occCounter=0;
   tns.forEach(tn=>{
     const txt=tn.textContent,lo=txt.toLowerCase();if(!lo.includes(q))return;
-    const parent=tn.parentNode;if(!parent)return;
     const frag=document.createDocumentFragment();let last=0,pos;
     while((pos=lo.indexOf(q,last))!==-1){
       if(pos>last)frag.appendChild(document.createTextNode(txt.slice(last,pos)));
-      const mk=document.createElement('mark');
-      const thisOcc=msgNode?msgNode._occCounter++:-1;
-      mk.className='hl'+(curOcc>=0&&thisOcc===curOcc?' cur':'');
+      const mk=document.createElement('mark');mk.className='hl'+(isCur?' cur':'');
       mk.textContent=txt.slice(pos,pos+q.length);frag.appendChild(mk);last=pos+q.length;
     }
     if(last<txt.length)frag.appendChild(document.createTextNode(txt.slice(last)));
-    parent.replaceChild(frag,tn);
+    tn.parentNode.replaceChild(frag,tn);tn.parentNode.normalize();
   });
 }
-function removeHL(){
-  vc.querySelectorAll('.msg-wrap').forEach(m=>{m._occCounter=undefined;});
-  vc.querySelectorAll('mark.hl').forEach(m=>{
-    const parent=m.parentNode;if(!parent)return;
-    parent.replaceChild(document.createTextNode(m.textContent),m);
-    parent.normalize();
-  });
-}
+function removeHL(){vc.querySelectorAll('mark.hl').forEach(m=>{m.parentNode.replaceChild(document.createTextNode(m.textContent),m);m.parentNode.normalize();});}
 function clearSearch(){searchInput.value='';srchQ='';srchHits=[];srchCur=-1;searchCount.textContent='';searchPrev.disabled=searchNext.disabled=true;removeHL();if(srchSbList)renderSrchSidebar();}
 
 // ── EXPORT MD (single) ────────────────────────────────
@@ -1778,8 +1783,8 @@ $('exp-pdf').addEventListener('click',()=>{
   if(!curConv||!curMsgs.length)return;
   const title=curConv.name||'conversation';
   let html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(title)}</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"><\/script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"><\/script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"><\/script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"><\/script>
   <style>body{font-family:system-ui,sans-serif;font-size:14px;line-height:1.7;max-width:800px;margin:0 auto;padding:32px;color:#1a1a1a}
@@ -1818,9 +1823,15 @@ $('exp-pdf').addEventListener('click',()=>{
   win.document.write(html);win.document.close();
   win.addEventListener('load',()=>setTimeout(()=>{
     try{if(win.renderMathInElement)win.renderMathInElement(win.document.body,{
-      delimiters:[{left:'$$',right:'$$',display:true},{left:'\\[',right:'\\]',display:true},
-        {left:'$',right:'$',display:false},{left:'\\(',right:'\\)',display:false}],
-      throwOnError:false,ignoredTags:['script','noscript','style','textarea','pre','code']});}catch(e){}
+      delimiters:[
+        {left:'$$',right:'$$',display:true},
+        {left:'\\[',right:'\\]',display:true},
+        {left:'$',right:'$',display:false},
+        {left:'\\(',right:'\\)',display:false}
+      ],
+      throwOnError:false,
+      ignoredTags:['script','noscript','style','textarea','pre','code']
+    });}catch(e){}
     setTimeout(()=>win.print(),400);
   },500));
 });
